@@ -72,7 +72,7 @@ These fields will be present in all logs. `_time` and `_msg`  are required by Vi
 | _time       | Log timestamp in UTC. |
 | _msg        | Log message. In case of exceptions, this will contain `Exception.Message` |
 | _stream     | Combination of `hostname` and `app_name` to uniquely identify application as per [VictoriaLogs docs](https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields). This reduces disk space usage and improves search performance in VictoriaLogs.
-| level       | Log level  as defined in https://learn.microsoft.com/en-us/dotnet/core/extensions/logging/overview?tabs=command-line#log-level |
+| level       | Log level  as defined in https://github.com/serilog/serilog/blob/dev/src/Serilog/Events/LogEventLevel.cs |
 | hostname    | Machine name from `Environment.MachineName` |
 | app_name    | `AppName` as specified in configuration or `Environment.ApplicationName` |
 
