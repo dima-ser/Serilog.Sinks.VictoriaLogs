@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
 
     <PackageId>Serilog.Sinks.VictoriaLogs</PackageId>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <Authors>dima-ser</Authors>
     <Description>Serilog sink for VictoriaLogs using Serilog.Sinks.Http</Description>
     <RepositoryUrl>https://github.com/dima-ser/Serilog.Sinks.VictoriaLogs</RepositoryUrl>

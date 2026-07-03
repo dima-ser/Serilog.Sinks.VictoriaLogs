@@ -19,9 +19,12 @@ namespace Serilog.Sinks.VictoriaLogs
     {
         public const string DEFAULT_STREAM_FIELDS= "MachineName,Application";
         bool lowerCasePropertyKeys;
-        public VictoriaLogsFormatter(bool lowerCasePropertyKeys)
+        IReadOnlyDictionary<string, string>? overridePropertyKeys;
+        public VictoriaLogsFormatter(bool lowerCasePropertyKeys, 
+        IReadOnlyDictionary<string, string>? overridePropertyKeys)
         {
             this.lowerCasePropertyKeys = lowerCasePropertyKeys;
+            this.overridePropertyKeys = overridePropertyKeys;
         }
 
         public void Format(LogEvent logEvent, TextWriter output)
@@ -42,10 +45,18 @@ namespace Serilog.Sinks.VictoriaLogs
 
             foreach (var property in logEvent.Properties)
             {
-                if (lowerCasePropertyKeys)
+                if (overridePropertyKeys != null && overridePropertyKeys.ContainsKey(property.Key))
+                {
+                    record[overridePropertyKeys[property.Key]] = property.Value.ToString().Trim('"');
+                }
+                else if (lowerCasePropertyKeys)
+                {
                     record[property.Key.ToLower()] = property.Value.ToString().Trim('"');
-                else
+                }
+                else 
+                {
                     record[property.Key] = property.Value.ToString().Trim('"');
+                }
             }   
 
             output.WriteLine(JsonSerializer.Serialize(record));
@@ -107,11 +118,21 @@ namespace Serilog.Sinks.VictoriaLogs
     public static class VictoriaLogsLoggerConfigurationExtensions
     {
         /// <summary>
-        /// Adds a sink that sends logs to VictoriaLogs using JSON Stream API: https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api
+        /// Adds a sink that sends logs to VictoriaLogs using JSON Stream API: 
+        /// https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api
         /// </summary>
         /// <param name="sinkConfiguration">The logger configuration.</param>
-        /// <param name="victoriaLogsEndpoint">The URL to VictoriaLogs JSON Strem API. For example: http://localhost:9428/insert/jsonline</param>
-        /// <param name="appName">Application name to identify the logs.</param>
+        /// <param name="victoriaLogsEndpoint">The URL to VictoriaLogs JSON Strem API. For example: 
+        /// http://localhost:9428/insert/jsonline</param>
+        /// <param name="lowerCasePropertyKeys">Whether to convert property keys to lower case to 
+        /// conform to VictoriaLogs convention. Default value is <see langword="true"/>.</param>
+        /// <param name="streamFields">Comma-separated field names that consitute a 
+        /// <a href="https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields">stream</a> 
+        /// in VictoriaLogs. Default value is <see cref="VictoriaLogsFormatter.DEFAULT_STREAM_FIELDS"/>.</param>
+        /// <param name="overridePropertyKeys">Property keys/log field names to override. The 
+        /// key is the original name, and the value is the new name. For example, if you want to 
+        /// override the property key "Application" to "app", you would specify a dictionary with a 
+        /// single entry: { "Application", "app" }. Default value is <see langword="null"/>.</param>
         /// <param name="queueLimitBytes">
         /// The maximum size, in bytes, of events stored in memory, waiting to be sent over the
         /// network. Specify <see langword="null"/> for no limit.
@@ -181,6 +202,7 @@ namespace Serilog.Sinks.VictoriaLogs
             string victoriaLogsEndpoint,
             bool lowerCasePropertyKeys = true,
             string streamFields = VictoriaLogsFormatter.DEFAULT_STREAM_FIELDS,
+            IReadOnlyDictionary<string, string>? overridePropertyKeys = null,           
             long? queueLimitBytes = null,
             long? logEventLimitBytes = null,
             int? logEventsInBatchLimit = 1000,
@@ -199,7 +221,7 @@ namespace Serilog.Sinks.VictoriaLogs
 
             // // Default values
              period ??= TimeSpan.FromSeconds(2);
-             textFormatter ??= new VictoriaLogsFormatter(lowerCasePropertyKeys);
+             textFormatter ??= new VictoriaLogsFormatter(lowerCasePropertyKeys, overridePropertyKeys);
              batchFormatter ??= new VictoriaLogsBatchFormatter();
              httpClient ??= new VictoriaLogsHttpClient(lowerCasePropertyKeys ? streamFields.ToLower() : streamFields);
 

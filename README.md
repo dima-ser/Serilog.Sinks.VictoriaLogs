@@ -46,6 +46,7 @@ Replace `victoriaLogsEndpoint` and `Application` with your Victoria Logs JSON St
 | **victoriaLogsEndpoint** | Required. URL to VictoriaLogs [HTTP JSON Stream API](https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api). |
 | **lowerCasePropertyKeys** | Optional. Whether to convert log event property keys to lower case to conform to VictoriaLogs convention. Default value: true |
 | **streamFields** | Optional. Comma-separated field names that consitute a [stream](https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields) in VictoriaLogs. Default value: `MachineName,Application` |
+| **overridePropertyKeys** | Optional. A Dictionary with property keys/log field names to override. The key is the original name, and the value is the new name. For example, if you want to override the property key `Application` to `app`, you would specify a dictionary with a single entry: `{ "Application", "app" }`. Default value: `null` |
 
 
 ### Register the logging provider
