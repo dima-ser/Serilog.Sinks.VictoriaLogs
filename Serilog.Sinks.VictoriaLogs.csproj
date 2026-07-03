@@ -8,7 +8,7 @@
     <Version>0.1.1</Version>
     <Authors>dima-ser</Authors>
     <Description>Serilog sink for VictoriaLogs using Serilog.Sinks.Http</Description>
-    <RepositoryUrl>TODO</RepositoryUrl>
+    <RepositoryUrl>https://github.com/dima-ser/Serilog.Sinks.VictoriaLogs</RepositoryUrl>
     <RootNamespace>Serilog.Sinks.VictoriaLogs</RootNamespace>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageReadmeFile>README.md</PackageReadmeFile>
