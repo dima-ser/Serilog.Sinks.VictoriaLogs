@@ -74,7 +74,7 @@ These fields will be present in all logs. `_time` and `_msg`  are required by Vi
 | _stream     | Combination of `hostname` and `app_name` to uniquely identify application as per [VictoriaLogs docs](https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields). This reduces disk space usage and improves search performance in VictoriaLogs.
 | level       | Log level  as defined in https://github.com/serilog/serilog/blob/dev/src/Serilog/Events/LogEventLevel.cs |
 | hostname    | Machine name from `Environment.MachineName` |
-| app_name    | `AppName` as specified in configuration or `Environment.ApplicationName` |
+| app_name    | `AppName` as specified in configuration or `builder.Environment.ApplicationName` |
 
 ### Optional fields
 These fields may or may not be present in the log depending on the type of log
