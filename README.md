@@ -19,71 +19,57 @@ dotnet add package Serilog.Sinks.VictoriaLogs --source [/your-local/package-sour
 ```
 
 ### Configure
-In your `appsettings.json`, add section called `VictoriaLogs`:
-
-```json
-{
-  ...,
-  "VictoriaLogs": {
-    "Endpoint": "http://localhost:9428/insert/jsonline",
-    "AppName": "MyApp",
-    "LogLevel": "Warning"
-  }
-}
-```
-| Config parameter | Description |
-|----------|--------|
-| **Endpoint** | Required. URL to VictoriaLogs [HTTP JSON Stream API](https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api). |
-| **AppName** | Optional. Overrides the `app_name` field that gets passed to VictoriaLogs. If not provided, `builder.Environment.ApplicationName` will be used. |
-| **LogLevel** | Optional. Minimum [log event level](https://github.com/serilog/serilog/blob/dev/src/Serilog/Events/LogEventLevel.cs) to log to VictoriaLogs. Default value: Information. See important note [below](#seriloglevel) |
-
-
-### Register the logging provider
-In your `Program.cs`
-```c#
-using Serilog.Sinks.VictoriaLogs
-
-var builder = WebApplication.CreateBuilder(args);
-builder.AddVictoriaLogs();
-```
-
-The application will now log everything to VictoriaLogs. 
-
-## <a name="seriloglevel"></a>Logging below `Information` level
-Note that if you want to log more verbose (e.g., Debug) you will need to override Serilog's global log level as well. Add this to your configuration:
+Like other Serilog sinks, `VictoriaLogsHttp` can be configured via configuration file, in code or combining both. Below is an example of the minimum working configuration. 
+In your `appsettings.json`, add the `Serilog` section (must be in the root):
 
 ```json
 {
   ...,
   "Serilog": {
-    "MinimumLevel": { "Default": "Debug" }
+    "Using":  [ "Serilog.Sinks.Console", "Serilog.Sinks.VictoriaLogs" ],
+    "MinimumLevel": "Information",
+    "WriteTo": [
+      { "Name": "Console" },
+      { "Name": "VictoriaLogsHttp", "Args": { "victoriaLogsEndpoint": "http://localhost:9428/insert/jsonline"} }
+    ],
+    "Enrich": [ "WithMachineName" ],
+    "Properties": {
+        "Application": "AppName"
+    }
   }
 }
 ```
+Replace `victoriaLogsEndpoint` and `Application` with your Victoria Logs JSON Stream API endpoint and your application name accordingly. You can also add additional settings as per [Serilog documentation](https://github.com/serilog/serilog-settings-configuration). Similarly, you can add or override arguments to `VictoriaLogsHttp:Args` as per [Serilog.Sinks.Http documenation](https://github.com/FantasticFiasco/serilog-sinks-http). Below is the description of arguments specific to `VictoriaLogsHttp` sink only. 
 
-## Log fields
-The library will log the following fields to VictoriaLogs.  
+| Parameter | Description |
+|----------|--------|
+| **victoriaLogsEndpoint** | Required. URL to VictoriaLogs [HTTP JSON Stream API](https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api). |
+| **lowerCasePropertyKeys** | Optional. Whether to convert log event property keys to lower case to conform to VictoriaLogs convention. Default value: true |
+| **streamFields** | Optional. Comma-separated field names that consitute a [stream](https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields) in VictoriaLogs. Default value: `MachineName,Application` |
 
-### General fields
-These fields will be present in all logs. `_time` and `_msg`  are required by VictoriaLogs.
 
-| Field name  | Description |
-| ----------- | ----------- |
-| _time       | Log timestamp in UTC. |
-| _msg        | Log message. In case of exceptions, this will contain `Exception.Message` |
-| _stream     | Combination of `hostname` and `app_name` to uniquely identify application as per [VictoriaLogs docs](https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields). This reduces disk space usage and improves search performance in VictoriaLogs.
-| level       | Log level  as defined in https://github.com/serilog/serilog/blob/dev/src/Serilog/Events/LogEventLevel.cs |
-| hostname    | Machine name from `Environment.MachineName` |
-| app_name    | `AppName` as specified in configuration or `builder.Environment.ApplicationName` |
+### Register the logging provider
+In your `Program.cs`
+```c#
+using Serilog;
+using Serilog.Sinks.VictoriaLogs
 
-### Optional fields
-These fields may or may not be present in the log depending on the type of log
-| Field name  | Description |
-| ----------- | ----------- |
-| url         | Full URL of the current request, including query string |
-| method      | Current request HTTP method |
-| remote_ip   | IP address of the current request |
-| user_id     | Currently authenticated user  |
-| user_agent  | User agent of the current request |
-| exception     | Exception stack trace   |
-| exception_type | Exception type |
+var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog((context, configuration) =>
+  {   
+      configuration.ReadFrom.Configuration(context.Configuration);
+  });
+```
+You are done, the application should now log everything to VictoriaLogs.
+
+If you wish to enrich the logs with context-specific fields (RemoteIp, RequestMethod, UserAgent, etc), add `VictoriaLogsEnricher`. This can only be configured in code:
+```c#
+builder.Services.AddHttpContextAccessor();
+builder.Host.UseSerilog((context, services, configuration) =>
+  {   var accessor = services.GetRequiredService<IHttpContextAccessor>();
+      configuration.ReadFrom.Configuration(context.Configuration)
+      .Enrich.With(new VictoriaLogsEnricher(accessor));
+  });
+```
+
+

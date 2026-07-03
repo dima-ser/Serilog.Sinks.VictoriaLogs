@@ -1,58 +1,59 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using Serilog.Core;
 using Serilog.Configuration;
 using Serilog.Events;
 using Serilog.Formatting;
+using Serilog.Sinks.Http;
 using Serilog.Sinks.Http.HttpClients;
 using System.Text.Json;
 
+
 namespace Serilog.Sinks.VictoriaLogs
 {
-    public sealed class VictoriaLogFormatter : ITextFormatter
+    public sealed class VictoriaLogsFormatter : ITextFormatter
     {
-        string hostname = "";
-        string app_name = "";
-        private readonly IHttpContextAccessor contextAccessor;
-        public VictoriaLogFormatter(string hostname, string app_name, IHttpContextAccessor contextAccessor)
+        public const string DEFAULT_STREAM_FIELDS= "MachineName,Application";
+        bool lowerCasePropertyKeys;
+        public VictoriaLogsFormatter(bool lowerCasePropertyKeys)
         {
-            this.hostname = hostname;
-            this.app_name = app_name;
-            this.contextAccessor = contextAccessor;
+            this.lowerCasePropertyKeys = lowerCasePropertyKeys;
         }
 
         public void Format(LogEvent logEvent, TextWriter output)
         {
-            var context = contextAccessor.HttpContext;
-            var request = context?.Request;
+            
             var record = new Dictionary<string, object?>
             {
                 ["_msg"] = logEvent.Exception != null ? logEvent.Exception.Message : logEvent.RenderMessage(),
-                ["level"] = logEvent.Level.ToString().ToLower(),
-                ["_time"] = logEvent.Timestamp.UtcDateTime.ToString("O"),
-                ["hostname"] = hostname,
-                ["app_name"] = app_name,
-                ["url"] = request != null ? Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(request) : null,
-                ["method"] = request?.Method,
-                ["remote_ip"] = context?.Connection?.RemoteIpAddress?.ToString(),
-                ["user_id"] = context?.User?.Identity?.IsAuthenticated == true ? context.User.Identity.Name : null,
-                ["user_agent"] = request?.Headers["User-Agent"].ToString(),
+                ["level"] = logEvent.Level.ToString(),
+                ["_time"] = logEvent.Timestamp.UtcDateTime.ToString("O"),         
             };
-
 
             if (logEvent.Exception != null)
             {
                 record["exception"] = logEvent.Exception.ToString();
                 record["exception_type"] = logEvent.Exception.GetType().FullName;
             }
+
+            foreach (var property in logEvent.Properties)
+            {
+                if (lowerCasePropertyKeys)
+                    record[property.Key.ToLower()] = property.Value.ToString().Trim('"');
+                else
+                    record[property.Key] = property.Value.ToString().Trim('"');
+            }   
+
             output.WriteLine(JsonSerializer.Serialize(record));
         }
 
     }
 
-    public sealed class VictoriaLogBatchFormatter : Serilog.Sinks.Http.IBatchFormatter
+    public sealed class VictoriaLogsBatchFormatter : Serilog.Sinks.Http.IBatchFormatter
     {
         public void Format(IEnumerable<string> logEvents, TextWriter output)
         {
@@ -87,119 +88,169 @@ namespace Serilog.Sinks.VictoriaLogs
 
     public sealed class VictoriaLogsHttpClient : JsonHttpClient
     {
-        public VictoriaLogsHttpClient()
-            : base(CreateHttpClient())
+
+        public VictoriaLogsHttpClient(string streamFields)
+            : base(CreateHttpClient(streamFields))
         {
         }
 
-        private static HttpClient CreateHttpClient()
+        private static HttpClient CreateHttpClient(string streamFields)
         {
             var client = new HttpClient();
 
-            client.DefaultRequestHeaders.Add("VL-Stream-Fields", "hostname,app_name");
+            client.DefaultRequestHeaders.Add("VL-Stream-Fields", streamFields);
 
             return client;
         }
     }
 
-    public class VictoriaLogsOptions
-    {
-        public const string CONFIG_NAME = "VictoriaLogs";
-        public string Endpoint { get; set; } = string.Empty;
-        public string AppName { get; set; } = string.Empty;
-        public LogEventLevel LogLevel { get; set; } = LogEventLevel.Information;
-    }
-
     public static class VictoriaLogsLoggerConfigurationExtensions
     {
+        /// <summary>
+        /// Adds a sink that sends logs to VictoriaLogs using JSON Stream API: https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api
+        /// </summary>
+        /// <param name="sinkConfiguration">The logger configuration.</param>
+        /// <param name="victoriaLogsEndpoint">The URL to VictoriaLogs JSON Strem API. For example: http://localhost:9428/insert/jsonline</param>
+        /// <param name="appName">Application name to identify the logs.</param>
+        /// <param name="queueLimitBytes">
+        /// The maximum size, in bytes, of events stored in memory, waiting to be sent over the
+        /// network. Specify <see langword="null"/> for no limit.
+        /// </param>
+        /// <param name="logEventLimitBytes">
+        /// The maximum size, in bytes, for a serialized representation of a log event. Log events
+        /// exceeding this size will be dropped. Specify <see langword="null"/> for no limit. Default
+        /// value is <see langword="null"/>.
+        /// </param>
+        /// <param name="logEventsInBatchLimit">
+        /// The maximum number of log events sent as a single batch over the network. Default
+        /// value is 1000.
+        /// </param>
+        /// <param name="batchSizeLimitBytes">
+        /// The approximate maximum size, in bytes, for a single batch. The value is an
+        /// approximation because only the size of the log events are considered. The extra
+        /// characters added by the batch formatter, where the sequence of serialized log events
+        /// are transformed into a payload, are not considered. Please make sure to accommodate for
+        /// those.
+        /// <para />
+        /// Another thing to mention is that although the sink does its best to optimize for this
+        /// limit, if you decide to use an implementation of <seealso cref="IHttpClient"/> that is
+        /// compressing the payload, e.g. <seealso cref="JsonGzipHttpClient"/>, this parameter
+        /// describes the uncompressed size of the log events. The compressed size might be
+        /// significantly smaller depending on the compression algorithm and the repetitiveness of
+        /// the log events.
+        /// <para />
+        /// Default value is <see langword="null"/>.
+        /// </param>
+        /// <param name="period">
+        /// The time to wait between checking for event batches. Default value is 2 seconds.
+        /// </param>
+        /// <param name="flushOnClose">
+        /// Whether to send the log events stored in memory during the sink's disposal, thus ensuring
+        /// that all generated log event are sent to the log server before sink closes. Default value
+        /// is <see langword="true"/>.
+        /// </param>
+        /// <param name="textFormatter">
+        /// The formatter rendering individual log events into text, for example JSON. Default
+        /// value is <see cref="VictoriaLogsTextFormatter"/>.
+        /// </param>
+        /// <param name="batchFormatter">
+        /// The formatter batching multiple log events into a payload that can be sent over the
+        /// network. Default value is <see cref="VictoriaLogsBatchFormatter"/>.
+        /// </param>
+        /// <param name="restrictedToMinimumLevel">
+        /// The minimum level for events passed through the sink. Ignored when
+        /// <paramref name="levelSwitch"/> is specified. Default value is
+        /// <see cref="LevelAlias.Minimum"/>.
+        /// </param>
+        /// <param name="levelSwitch">
+        /// A switch allowing the pass-through minimum level to be changed at runtime.
+        /// </param>
+        /// <param name="httpClient">
+        /// A custom <see cref="IHttpClient"/> implementation. Default value is
+        /// <see cref="VictoriaLogsHttpClient"/>.
+        /// </param>
+        /// <param name="configuration">
+        /// Configuration passed to <paramref name="httpClient"/>. Parameter is either manually
+        /// specified when configuring the sink in source code or automatically passed in when
+        /// configuring the sink using
+        /// <see href="https://www.nuget.org/packages/Serilog.Settings.Configuration">Serilog.Settings.Configuration</see>.
+        /// </param>
+        /// <returns>Logger configuration, allowing configuration to continue.</returns>
         public static LoggerConfiguration VictoriaLogsHttp(
             this LoggerSinkConfiguration sinkConfiguration,
-            IConfiguration configuration,
-            IServiceProvider services,
-            string configurationSection = VictoriaLogsOptions.CONFIG_NAME,
-            string defaultAppName = "")
+            string victoriaLogsEndpoint,
+            bool lowerCasePropertyKeys = true,
+            string streamFields = VictoriaLogsFormatter.DEFAULT_STREAM_FIELDS,
+            long? queueLimitBytes = null,
+            long? logEventLimitBytes = null,
+            int? logEventsInBatchLimit = 1000,
+            long? batchSizeLimitBytes = null,
+            TimeSpan? period = null,
+            bool flushOnClose = true,
+            ITextFormatter? textFormatter = null,
+            VictoriaLogsBatchFormatter? batchFormatter = null,
+            LogEventLevel restrictedToMinimumLevel = LevelAlias.Minimum,
+            LoggingLevelSwitch? levelSwitch = null,
+            VictoriaLogsHttpClient? httpClient = null,
+            IConfiguration? configuration = null)
         {
             if (sinkConfiguration == null) throw new ArgumentNullException(nameof(sinkConfiguration));
-            if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-            if (services == null) throw new ArgumentNullException(nameof(services));
+            if (victoriaLogsEndpoint == null) throw new ArgumentNullException(nameof(victoriaLogsEndpoint));
 
-            var options = configuration
-                .GetSection(configurationSection)
-                .Get<VictoriaLogsOptions>() ?? new VictoriaLogsOptions();
+            // // Default values
+             period ??= TimeSpan.FromSeconds(2);
+             textFormatter ??= new VictoriaLogsFormatter(lowerCasePropertyKeys);
+             batchFormatter ??= new VictoriaLogsBatchFormatter();
+             httpClient ??= new VictoriaLogsHttpClient(lowerCasePropertyKeys ? streamFields.ToLower() : streamFields);
 
-            if (string.IsNullOrWhiteSpace(options.Endpoint))
+            if (configuration != null)
             {
-                throw new InvalidOperationException($"Configuration section '{configurationSection}:{nameof(VictoriaLogsOptions.Endpoint)}' is required.");
+                httpClient.Configure(configuration);
             }
 
-            var httpContextAccessor = services.GetService<IHttpContextAccessor>();
-            if (httpContextAccessor == null)
-            {
-                throw new InvalidOperationException("IHttpContextAccessor is not registered. Call AddHttpContextAccessor().");
-            }
-
-            var appName = string.IsNullOrWhiteSpace(options.AppName)
-                ? defaultAppName
-                : options.AppName;
-            Console.Write("log level is " + options.LogLevel.ToString());
             return sinkConfiguration.Http(
-                requestUri: options.Endpoint,
-                textFormatter: new VictoriaLogFormatter(
-                    Environment.MachineName,
-                    string.IsNullOrWhiteSpace(appName) ? string.Empty : appName,
-                    httpContextAccessor),
-                batchFormatter: new VictoriaLogBatchFormatter(),
-                httpClient: new VictoriaLogsHttpClient(),
-                restrictedToMinimumLevel: options.LogLevel,
-                queueLimitBytes: null);
-        }
+                requestUri: victoriaLogsEndpoint,
+                textFormatter: textFormatter,
+                batchFormatter: batchFormatter,
+                httpClient: httpClient,
+                restrictedToMinimumLevel: restrictedToMinimumLevel,
+                levelSwitch: levelSwitch,
+                queueLimitBytes: queueLimitBytes,
+                logEventLimitBytes: logEventLimitBytes,
+                logEventsInBatchLimit: logEventsInBatchLimit,
+                batchSizeLimitBytes: batchSizeLimitBytes,
+                period: period.Value,
+                flushOnClose: flushOnClose);
 
-        // public static LoggerConfiguration VictoriaLogsHttp(
-        //     this LoggerConfiguration loggerConfiguration,
-        //     IConfiguration configuration,
-        //     IServiceProvider services,
-        //     string configurationSection = "VictoriaLogs")
-        // {
-        //     if (loggerConfiguration == null) throw new ArgumentNullException(nameof(loggerConfiguration));
-        //     if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-        //     if (services == null) throw new ArgumentNullException(nameof(services));
 
-        //     return loggerConfiguration.WriteTo.VictoriaLogsHttp(configuration, services, configurationSection);
-        // }
-
-        public static LoggerConfiguration VictoriaLogsHttp(
-            this LoggerConfiguration loggerConfiguration,
-            IConfiguration configuration,
-            IServiceProvider services,
-            string configurationSection,
-            string defaultAppName)
-        {
-            if (loggerConfiguration == null) throw new ArgumentNullException(nameof(loggerConfiguration));
-            if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-            if (services == null) throw new ArgumentNullException(nameof(services));
-
-            return loggerConfiguration.WriteTo.VictoriaLogsHttp(configuration, services, configurationSection, defaultAppName);
         }
     }
-
-    public static class VictoriaLogsWebApplicationBuilderExtensions
+    public class VictoriaLogsEnricher : ILogEventEnricher
     {
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public static WebApplicationBuilder AddVictoriaLogs(
-            this WebApplicationBuilder builder,
-            string configurationSection = VictoriaLogsOptions.CONFIG_NAME)
+        public VictoriaLogsEnricher(IHttpContextAccessor httpContextAccessor)
         {
-            if (builder == null) throw new ArgumentNullException(nameof(builder));
+            _httpContextAccessor = httpContextAccessor;
+        }
 
-            builder.Services.AddHttpContextAccessor();
-            builder.Host.UseSerilog((context, services, configuration) =>
-            {
-                configuration
-                .ReadFrom.Configuration(context.Configuration)
-                .VictoriaLogsHttp(builder.Configuration, services, configurationSection, builder.Environment.ApplicationName);
-            });
-
-            return builder;
+        public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
+        {
+            logEvent.AddPropertyIfAbsent(
+                propertyFactory.CreateProperty("MachineName", Environment.MachineName));
+            var context = _httpContextAccessor.HttpContext;
+            if (context == null) return;
+            logEvent.AddPropertyIfAbsent(
+                propertyFactory.CreateProperty("RequestMethod", context.Request.Method));
+            logEvent.AddPropertyIfAbsent(
+                propertyFactory.CreateProperty("RequestUrl", context.Request.GetDisplayUrl()));
+            logEvent.AddPropertyIfAbsent(
+                propertyFactory.CreateProperty("RemoteIp", context.Connection?.RemoteIpAddress?.ToString()));
+            logEvent.AddPropertyIfAbsent(
+                propertyFactory.CreateProperty("User", context.User?.Identity?.IsAuthenticated == true ? context.User.Identity.Name : ""));
+            logEvent.AddPropertyIfAbsent(
+                propertyFactory.CreateProperty("UserAgent", context.Request.Headers["User-Agent"].ToString()));   
         }
     }
+
 }
