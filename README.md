@@ -1,6 +1,5 @@
 # Serilog.Sinks.VictoriaLogs
-Allows logging from your .NET app directly to [VictoriaLogs](https://docs.victoriametrics.com/victorialogs/) using [JSON Stream API](https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api). Depends on [Serilog](https://github.com/serilog/serilog-aspnetcore) and 
-[Serilog.Sinks.Http](https://github.com/FantasticFiasco/serilog-sinks-http). 
+Allows logging from your .NET app directly to [VictoriaLogs](https://docs.victoriametrics.com/victorialogs/) using [JSON Stream API](https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api). Depends on [Serilog](https://github.com/serilog/serilog-aspnetcore) and [Serilog.Sinks.Http](https://github.com/FantasticFiasco/serilog-sinks-http). 
 ## Requirements
 .NET 10.0+
 ## How to use
@@ -58,9 +57,7 @@ builder.Host.UseSerilog((context, configuration) =>
 ```
 You are done, the application should now log everything to VictoriaLogs.
 
-If you wish to enrich the logs with context-specific fields you can add any Serilog enrichers by referencing an appropriate 
-enricher package such as `Serilog.Enrichers.Environment` or `Serilog.Enrichers.ClientInfo` and adding the enrichers in code 
-or configuration. For example:
+If you wish to enrich the logs with context-specific fields you can add any Serilog enrichers by referencing an appropriate enricher package such as `Serilog.Enrichers.Environment` or `Serilog.Enrichers.ClientInfo` and adding the enrichers in code or configuration. For example:
 ```c#
 builder.Services.AddHttpContextAccessor();
 builder.Host.UseSerilog((context, services, configuration) =>

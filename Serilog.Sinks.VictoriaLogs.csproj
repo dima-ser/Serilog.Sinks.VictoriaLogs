@@ -6,6 +6,7 @@
 
     <PackageId>Serilog.Sinks.VictoriaLogs</PackageId>
     <Version>0.2.4</Version>
+    <PackageReleaseNotes>Simplify default enrichment and remove unneeded dependencies</PackageReleaseNotes>
     <Authors>dima-ser</Authors>
     <Description>Serilog sink for VictoriaLogs using Serilog.Sinks.Http</Description>
     <RepositoryUrl>https://github.com/dima-ser/Serilog.Sinks.VictoriaLogs</RepositoryUrl>
