@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
 
     <PackageId>Serilog.Sinks.VictoriaLogs</PackageId>
-    <Version>0.1.3</Version>
+    <Version>0.2.4</Version>
     <Authors>dima-ser</Authors>
     <Description>Serilog sink for VictoriaLogs using Serilog.Sinks.Http</Description>
     <RepositoryUrl>https://github.com/dima-ser/Serilog.Sinks.VictoriaLogs</RepositoryUrl>
@@ -17,7 +17,6 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
-    <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageReference Include="Serilog.Sinks.Http" Version="9.2.1" />
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>

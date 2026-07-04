@@ -31,59 +31,54 @@ In your `appsettings.json`, add the `Serilog` section (must be in the root):
     "WriteTo": [
       { "Name": "Console" },
       { "Name": "VictoriaLogsHttp", "Args": { "victoriaLogsEndpoint": "http://localhost:9428/insert/jsonline"} }
-    ],
-    "Enrich": [ "WithMachineName" ],
-    "Properties": {
-        "Application": "AppName"
-    }
+    ]
   }
 }
 ```
-Replace `victoriaLogsEndpoint` and `Application` with your Victoria Logs JSON Stream API endpoint and your application name accordingly. You can also add additional settings as per [Serilog documentation](https://github.com/serilog/serilog-settings-configuration). Similarly, you can add or override arguments to `VictoriaLogsHttp:Args` as per [Serilog.Sinks.Http documenation](https://github.com/FantasticFiasco/serilog-sinks-http). Below is the description of arguments specific to `VictoriaLogsHttp` sink only. 
+Replace `victoriaLogsEndpoint` with your Victoria Logs JSON Stream API endpoint. You can also add additional settings as per [Serilog documentation](https://github.com/serilog/serilog-settings-configuration). Similarly, you can add or override arguments to `VictoriaLogsHttp:Args` as per [Serilog.Sinks.Http documenation](https://github.com/FantasticFiasco/serilog-sinks-http). Below is the description of arguments specific to `VictoriaLogsHttp` sink only. 
 
 | Parameter | Description |
 |----------|--------|
 | **victoriaLogsEndpoint** | Required. URL to VictoriaLogs [HTTP JSON Stream API](https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api). |
-| **lowerCasePropertyKeys** | Optional. Whether to convert log event property keys to lower case to conform to VictoriaLogs convention. Default value: true |
-| **streamFields** | Optional. Comma-separated field names that consitute a [stream](https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields) in VictoriaLogs. Default value: `MachineName,Application` |
-| **overridePropertyKeys** | Optional. A Dictionary with property keys/log field names to override. The key is the original name, and the value is the new name. For example, if you want to override the property key `MachineName` to `hostname`, you would specify a dictionary with a single entry: `{ "MachineName", "hostname" }`. Default value: `null` |
+| **lowerCasePropertyKeys** | Optional. Whether to convert log field names to lower case to conform to VictoriaLogs convention. Default value: true |
+| **streamFields** | Optional. Comma-separated field names that consitute a [stream](https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields) in VictoriaLogs. By default, this is using `hostname,app_name` which are injected automatically by the sink. You can override this by providing your own field names. |
+
 
 
 ### Register the logging provider
 In your `Program.cs`
 ```c#
 using Serilog;
-using Serilog.Sinks.VictoriaLogs
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((context, configuration) =>
-  {   
-      configuration.ReadFrom.Configuration(context.Configuration);
-  });
+{   
+    configuration.ReadFrom.Configuration(context.Configuration);
+});
 ```
 You are done, the application should now log everything to VictoriaLogs.
 
-If you wish to enrich the logs with context-specific fields (RemoteIp, RequestMethod, UserAgent, etc), add `VictoriaLogsEnricher`. This can only be configured in code:
+If you wish to enrich the logs with context-specific fields you can add any Serilog enrichers by referencing an appropriate 
+enricher package such as `Serilog.Enrichers.Environment` or `Serilog.Enrichers.ClientInfo` and adding the enrichers in code 
+or configuration. For example:
 ```c#
 builder.Services.AddHttpContextAccessor();
 builder.Host.UseSerilog((context, services, configuration) =>
-  {   var accessor = services.GetRequiredService<IHttpContextAccessor>();
-      configuration.ReadFrom.Configuration(context.Configuration)
-      .Enrich.With(new VictoriaLogsEnricher(accessor));
-  });
+{   
+    configuration.ReadFrom.Configuration(context.Configuration)
+    .Enrich.WithEnvironmentName()
+    .Enrich.WithEnvironmentUserName()
+    .Enrich.WithClientIp()
+    .Enrich.WithUserClaims();
+    });
 ```
-Other Serilog enrichers can be applied as well as per https://github.com/serilog/serilog/wiki/Enrichment
+Other Serilog enrichers can be applied as well as per https://github.com/serilog/serilog/wiki/Enrichment 
 
-For separate configuration in Development vs Production, you can either put your Development settings in `appsettings.Development.json` or preface `UseSerilog()` call with environment check:
+For separate configuration per environment, you can either put your environment-specific settings in `appsettings.[Environment].json` or preface `UseSerilog()` call with environment check:
 ```c#
 if (!builder.Environment.IsDevelopment())
 {
-    builder.Services.AddHttpContextAccessor();
-    builder.Host.UseSerilog((context, services, configuration) =>
-  {   var accessor = services.GetRequiredService<IHttpContextAccessor>();
-      configuration.ReadFrom.Configuration(context.Configuration)
-      .Enrich.With(new VictoriaLogsEnricher(accessor));
-  });
+  ...
 }
 ```
 

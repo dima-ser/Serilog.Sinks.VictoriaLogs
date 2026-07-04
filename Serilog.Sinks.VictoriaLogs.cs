@@ -11,30 +11,39 @@ using Serilog.Formatting;
 using Serilog.Sinks.Http;
 using Serilog.Sinks.Http.HttpClients;
 using System.Text.Json;
-
+using System.Reflection;
 
 namespace Serilog.Sinks.VictoriaLogs
 {
+    /// <summary>
+    /// A custom <see cref="ITextFormatter"/> implementation that formats log events as JSON objects to conform 
+    /// to VictoriaLogs <a href="https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api">JSON Stream API</a>. 
+    /// Adds VictoriaLogs specific fields such as "_msg", "_time". Automatically injects "hostname" (Environment.MachineName) and 
+    /// "app_name"(assembly name) which are used as stream fields for optimal VictoriaLogs functionality (can be overridden). Optionally adds 
+    /// "exception" and "exception_type" if an exception is present in the log event.
+    /// </summary>
     public sealed class VictoriaLogsFormatter : ITextFormatter
     {
-        public const string DEFAULT_STREAM_FIELDS= "MachineName,Application";
+        public const string DEFAULT_STREAM_FIELDS= "hostname,app_name";
         bool lowerCasePropertyKeys;
-        IReadOnlyDictionary<string, string>? overridePropertyKeys;
-        public VictoriaLogsFormatter(bool lowerCasePropertyKeys, 
-        IReadOnlyDictionary<string, string>? overridePropertyKeys)
+        //IReadOnlyDictionary<string, string>? overridePropertyKeys;
+        public VictoriaLogsFormatter(bool lowerCasePropertyKeys)
         {
             this.lowerCasePropertyKeys = lowerCasePropertyKeys;
-            this.overridePropertyKeys = overridePropertyKeys;
+            //this.overridePropertyKeys = overridePropertyKeys;
         }
 
         public void Format(LogEvent logEvent, TextWriter output)
         {
-            
+            Assembly assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+            string assemblyName = assembly.GetName().Name ?? "UnknownApplication";
             var record = new Dictionary<string, object?>
             {
                 ["_msg"] = logEvent.Exception != null ? logEvent.Exception.Message : logEvent.RenderMessage(),
                 ["level"] = logEvent.Level.ToString(),
-                ["_time"] = logEvent.Timestamp.UtcDateTime.ToString("O"),         
+                ["_time"] = logEvent.Timestamp.UtcDateTime.ToString("O"),   
+                ["hostname"] = Environment.MachineName,
+                ["app_name"] = assemblyName      
             };
 
             if (logEvent.Exception != null)
@@ -45,11 +54,12 @@ namespace Serilog.Sinks.VictoriaLogs
 
             foreach (var property in logEvent.Properties)
             {
-                if (overridePropertyKeys != null && overridePropertyKeys.ContainsKey(property.Key))
-                {
-                    record[overridePropertyKeys[property.Key]] = property.Value.ToString().Trim('"');
-                }
-                else if (lowerCasePropertyKeys)
+                // if (overridePropertyKeys != null && overridePropertyKeys.ContainsKey(property.Key))
+                // {
+                //     record[overridePropertyKeys[property.Key]] = property.Value.ToString().Trim('"');
+                // }
+                //else 
+                if (lowerCasePropertyKeys)
                 {
                     record[property.Key.ToLower()] = property.Value.ToString().Trim('"');
                 }
@@ -63,7 +73,10 @@ namespace Serilog.Sinks.VictoriaLogs
         }
 
     }
-
+    /// <summary>
+    /// A custom <see cref="IBatchFormatter"/> implementation that formats a batch of log events as a sequence of JSON objects, 
+    /// each on a new line to conform to VictoriaLogs <a href="https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api">JSON Stream API</a>
+    /// </summary>
     public sealed class VictoriaLogsBatchFormatter : Serilog.Sinks.Http.IBatchFormatter
     {
         public void Format(IEnumerable<string> logEvents, TextWriter output)
@@ -90,13 +103,15 @@ namespace Serilog.Sinks.VictoriaLogs
                 {
                     output.Write(separator);
                     output.Write(logEvent);
-                    separator = "\n";
+                    separator = Environment.NewLine;
                 }
             }
         }
     }
 
-
+    /// <summary>
+    /// A custom <see cref="IHttpClient"/> implementation that adds the "VL-Stream-Fields" header to the HTTP request.
+    /// </summary>
     public sealed class VictoriaLogsHttpClient : JsonHttpClient
     {
 
@@ -129,10 +144,6 @@ namespace Serilog.Sinks.VictoriaLogs
         /// <param name="streamFields">Comma-separated field names that consitute a 
         /// <a href="https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields">stream</a> 
         /// in VictoriaLogs. Default value is <see cref="VictoriaLogsFormatter.DEFAULT_STREAM_FIELDS"/>.</param>
-        /// <param name="overridePropertyKeys">Property keys/log field names to override. The 
-        /// key is the original name, and the value is the new name. For example, if you want to 
-        /// override the property key "Application" to "app", you would specify a dictionary with a 
-        /// single entry: { "Application", "app" }. Default value is <see langword="null"/>.</param>
         /// <param name="queueLimitBytes">
         /// The maximum size, in bytes, of events stored in memory, waiting to be sent over the
         /// network. Specify <see langword="null"/> for no limit.
@@ -201,8 +212,7 @@ namespace Serilog.Sinks.VictoriaLogs
             this LoggerSinkConfiguration sinkConfiguration,
             string victoriaLogsEndpoint,
             bool lowerCasePropertyKeys = true,
-            string streamFields = VictoriaLogsFormatter.DEFAULT_STREAM_FIELDS,
-            IReadOnlyDictionary<string, string>? overridePropertyKeys = null,           
+            string streamFields = VictoriaLogsFormatter.DEFAULT_STREAM_FIELDS,      
             long? queueLimitBytes = null,
             long? logEventLimitBytes = null,
             int? logEventsInBatchLimit = 1000,
@@ -221,7 +231,7 @@ namespace Serilog.Sinks.VictoriaLogs
 
             // // Default values
              period ??= TimeSpan.FromSeconds(2);
-             textFormatter ??= new VictoriaLogsFormatter(lowerCasePropertyKeys, overridePropertyKeys);
+             textFormatter ??= new VictoriaLogsFormatter(lowerCasePropertyKeys);
              batchFormatter ??= new VictoriaLogsBatchFormatter();
              httpClient ??= new VictoriaLogsHttpClient(lowerCasePropertyKeys ? streamFields.ToLower() : streamFields);
 
@@ -243,36 +253,8 @@ namespace Serilog.Sinks.VictoriaLogs
                 batchSizeLimitBytes: batchSizeLimitBytes,
                 period: period.Value,
                 flushOnClose: flushOnClose);
-
-
         }
     }
-    public class VictoriaLogsEnricher : ILogEventEnricher
-    {
-        private readonly IHttpContextAccessor _httpContextAccessor;
-
-        public VictoriaLogsEnricher(IHttpContextAccessor httpContextAccessor)
-        {
-            _httpContextAccessor = httpContextAccessor;
-        }
-
-        public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
-        {
-            logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("hostname", Environment.MachineName));
-            var context = _httpContextAccessor.HttpContext;
-            if (context == null) return;
-            logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("request_method", context.Request.Method));
-            logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("request_url", context.Request.GetDisplayUrl()));
-            logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("remote_ip", context.Connection?.RemoteIpAddress?.ToString()));
-            logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("user", context.User?.Identity?.IsAuthenticated == true ? context.User.Identity.Name : ""));
-            logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("user_agent", context.Request.Headers["User-Agent"].ToString()));   
-        }
-    }
+   
 
 }
