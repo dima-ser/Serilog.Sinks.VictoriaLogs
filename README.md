@@ -72,5 +72,18 @@ builder.Host.UseSerilog((context, services, configuration) =>
       .Enrich.With(new VictoriaLogsEnricher(accessor));
   });
 ```
+Other Serilog enrichers can be applied as well as per https://github.com/serilog/serilog/wiki/Enrichment
 
+For separate configuration in Development vs Production, you can either put your Development settings in `appsettings.Development.json` or preface `UseSerilog()` call with environment check:
+```c#
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Services.AddHttpContextAccessor();
+    builder.Host.UseSerilog((context, services, configuration) =>
+  {   var accessor = services.GetRequiredService<IHttpContextAccessor>();
+      configuration.ReadFrom.Configuration(context.Configuration)
+      .Enrich.With(new VictoriaLogsEnricher(accessor));
+  });
+}
+```
 
