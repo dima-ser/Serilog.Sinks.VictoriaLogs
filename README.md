@@ -34,7 +34,7 @@ In your `appsettings.json`, add the `Serilog` section (must be in the root):
     ],
     "Enrich": [ "WithMachineName" ],
     "Properties": {
-        "Application": "AppName"
+        "app_name": "AppName"
     }
   }
 }
