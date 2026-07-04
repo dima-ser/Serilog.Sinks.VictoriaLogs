@@ -5,20 +5,17 @@ Allows logging from your .NET app directly to [VictoriaLogs](https://docs.victor
 ## How to use
 ### Reference in your project
 
-If adding from nuget.org:
-
 ```
  dotnet add package Serilog.Sinks.VictoriaLogs
 ```
-
-If building from source, clone the repo and build the project. Create a local nuget package source, then publish the .nupkg to your local package store. Then add it to your project:
-
+For ASP.NET Core web applications, you may also want to add `Serilog.AspNetCore` if you want to set Serilog as your default logging provider:
 ```
-dotnet add package Serilog.Sinks.VictoriaLogs --source [/your-local/package-source]
+ dotnet add package Serilog.AspNetCore
 ```
+
 
 ### Configure
-Like other Serilog sinks, `VictoriaLogsHttp` can be configured via configuration file, in code or combining both. Below is an example of the minimum working configuration. 
+Like other Serilog sinks, `VictoriaLogsHttp` can be configured via configuration file, in code or combining both. Below is an example of the minimum working configuration. Note that the instructions below are for ASP.NET Core web applications. Refer to [Serilog wiki](https://github.com/serilog/serilog/wiki/Getting-Started) for other application types, such as console application.
 In your `appsettings.json`, add the `Serilog` section (must be in the root):
 
 ```json
@@ -40,8 +37,7 @@ Replace `victoriaLogsEndpoint` with your Victoria Logs JSON Stream API endpoint.
 |----------|--------|
 | **victoriaLogsEndpoint** | Required. URL to VictoriaLogs [HTTP JSON Stream API](https://docs.victoriametrics.com/victorialogs/data-ingestion/#json-stream-api). |
 | **lowerCasePropertyKeys** | Optional. Whether to convert log field names to lower case to conform to VictoriaLogs convention. Default value: true |
-| **streamFields** | Optional. Comma-separated field names that consitute a [stream](https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields) in VictoriaLogs. By default, this is using `hostname,app_name` which are injected automatically by the sink. You can override this by providing your own field names. |
-
+| **streamFields** | Optional. Comma-separated field names that consitute a [stream](https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields) in VictoriaLogs. By default, this is using `hostname,app_name` which are injected automatically by the sink. `Environment.MachineName` is used for `hostname` and current assembly name is used for `app_name`. You can override this by providing your own field names to be used as stream fields. |
 
 
 ### Register the logging provider
@@ -56,6 +52,7 @@ builder.Host.UseSerilog((context, configuration) =>
 });
 ```
 You are done, the application should now log everything to VictoriaLogs.
+
 
 If you wish to enrich the logs with context-specific fields you can add any Serilog enrichers by referencing an appropriate enricher package such as `Serilog.Enrichers.Environment` or `Serilog.Enrichers.ClientInfo` and adding the enrichers in code or configuration. For example:
 ```c#
@@ -78,4 +75,5 @@ if (!builder.Environment.IsDevelopment())
   ...
 }
 ```
+
 

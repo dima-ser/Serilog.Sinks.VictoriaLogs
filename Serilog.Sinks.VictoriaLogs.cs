@@ -1,9 +1,4 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Serilog;
 using Serilog.Core;
 using Serilog.Configuration;
 using Serilog.Events;
@@ -26,11 +21,11 @@ namespace Serilog.Sinks.VictoriaLogs
     {
         public const string DEFAULT_STREAM_FIELDS= "hostname,app_name";
         bool lowerCasePropertyKeys;
-        //IReadOnlyDictionary<string, string>? overridePropertyKeys;
+
         public VictoriaLogsFormatter(bool lowerCasePropertyKeys)
         {
             this.lowerCasePropertyKeys = lowerCasePropertyKeys;
-            //this.overridePropertyKeys = overridePropertyKeys;
+
         }
 
         public void Format(LogEvent logEvent, TextWriter output)
@@ -54,11 +49,6 @@ namespace Serilog.Sinks.VictoriaLogs
 
             foreach (var property in logEvent.Properties)
             {
-                // if (overridePropertyKeys != null && overridePropertyKeys.ContainsKey(property.Key))
-                // {
-                //     record[overridePropertyKeys[property.Key]] = property.Value.ToString().Trim('"');
-                // }
-                //else 
                 if (lowerCasePropertyKeys)
                 {
                     record[property.Key.ToLower()] = property.Value.ToString().Trim('"');
@@ -139,7 +129,7 @@ namespace Serilog.Sinks.VictoriaLogs
         /// <param name="sinkConfiguration">The logger configuration.</param>
         /// <param name="victoriaLogsEndpoint">The URL to VictoriaLogs JSON Strem API. For example: 
         /// http://localhost:9428/insert/jsonline</param>
-        /// <param name="lowerCasePropertyKeys">Whether to convert property keys to lower case to 
+        /// <param name="lowerCasePropertyKeys">Whether to convert log property keys to lower case to 
         /// conform to VictoriaLogs convention. Default value is <see langword="true"/>.</param>
         /// <param name="streamFields">Comma-separated field names that consitute a 
         /// <a href="https://docs.victoriametrics.com/victorialogs/keyconcepts/#stream-fields">stream</a> 
