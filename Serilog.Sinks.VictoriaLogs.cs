@@ -259,19 +259,19 @@ namespace Serilog.Sinks.VictoriaLogs
         public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
         {
             logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("MachineName", Environment.MachineName));
+                propertyFactory.CreateProperty("hostname", Environment.MachineName));
             var context = _httpContextAccessor.HttpContext;
             if (context == null) return;
             logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("RequestMethod", context.Request.Method));
+                propertyFactory.CreateProperty("request_method", context.Request.Method));
             logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("RequestUrl", context.Request.GetDisplayUrl()));
+                propertyFactory.CreateProperty("request_url", context.Request.GetDisplayUrl()));
             logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("RemoteIp", context.Connection?.RemoteIpAddress?.ToString()));
+                propertyFactory.CreateProperty("remote_ip", context.Connection?.RemoteIpAddress?.ToString()));
             logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("User", context.User?.Identity?.IsAuthenticated == true ? context.User.Identity.Name : ""));
+                propertyFactory.CreateProperty("user", context.User?.Identity?.IsAuthenticated == true ? context.User.Identity.Name : ""));
             logEvent.AddPropertyIfAbsent(
-                propertyFactory.CreateProperty("UserAgent", context.Request.Headers["User-Agent"].ToString()));   
+                propertyFactory.CreateProperty("user_agent", context.Request.Headers["User-Agent"].ToString()));   
         }
     }
 
