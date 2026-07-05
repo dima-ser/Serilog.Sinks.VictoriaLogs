@@ -20,7 +20,6 @@ In your `appsettings.json`, add the `Serilog` section (must be in the root):
 
 ```json
 {
-  ...,
   "Serilog": {
     "Using":  [ "Serilog.Sinks.Console", "Serilog.Sinks.VictoriaLogs" ],
     "MinimumLevel": "Information",
