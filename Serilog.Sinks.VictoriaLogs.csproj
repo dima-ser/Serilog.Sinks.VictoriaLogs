@@ -1,19 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
     <PackageId>Serilog.Sinks.VictoriaLogs</PackageId>
-    <Version>0.2.6</Version>
-    <PackageReleaseNotes>Remove unneeded dependencies</PackageReleaseNotes>
+    <Version>0.2.7</Version>
+    <PackageReleaseNotes>Now the package targets both .NET 8.0 and 10.0</PackageReleaseNotes>
     <Authors>dima-ser</Authors>
     <Description>Serilog sink for VictoriaLogs using Serilog.Sinks.Http</Description>
     <RepositoryUrl>https://github.com/dima-ser/Serilog.Sinks.VictoriaLogs</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/dima-ser/Serilog.Sinks.VictoriaLogs</PackageProjectUrl>
     <RootNamespace>Serilog.Sinks.VictoriaLogs</RootNamespace>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>serilog;victoria;victorialogs;log;logging</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Serilog.Sinks.Http" Version="9.2.1" />
