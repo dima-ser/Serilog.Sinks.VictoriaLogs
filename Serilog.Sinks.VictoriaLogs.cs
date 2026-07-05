@@ -20,6 +20,7 @@ namespace Serilog.Sinks.VictoriaLogs
     public sealed class VictoriaLogsFormatter : ITextFormatter
     {
         public const string DEFAULT_STREAM_FIELDS= "hostname,app_name";
+        public const string DEFAULT_APPLICATION_NAME = "UnknownApplication";
         bool lowerCasePropertyKeys;
 
         public VictoriaLogsFormatter(bool lowerCasePropertyKeys)
@@ -31,20 +32,20 @@ namespace Serilog.Sinks.VictoriaLogs
         public void Format(LogEvent logEvent, TextWriter output)
         {
             Assembly assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-            string assemblyName = assembly.GetName().Name ?? "UnknownApplication";
+            string assemblyName = assembly.GetName().Name ?? DEFAULT_APPLICATION_NAME;
             var record = new Dictionary<string, object?>
             {
                 ["_msg"] = logEvent.Exception != null ? logEvent.Exception.Message : logEvent.RenderMessage(),
-                ["level"] = logEvent.Level.ToString(),
                 ["_time"] = logEvent.Timestamp.UtcDateTime.ToString("O"),   
                 ["hostname"] = Environment.MachineName,
-                ["app_name"] = assemblyName      
+                ["app_name"] = assemblyName,      
+                ["level"] = logEvent.Level.ToString()
             };
 
             if (logEvent.Exception != null)
             {
-                record["exception"] = logEvent.Exception.ToString();
-                record["exception_type"] = logEvent.Exception.GetType().FullName;
+                record["_exception"] = logEvent.Exception.ToString();
+                record["_exception_type"] = logEvent.Exception.GetType().FullName;
             }
 
             foreach (var property in logEvent.Properties)
