@@ -22,7 +22,7 @@ In your `appsettings.json`, add the `Serilog` section (must be in the root):
 {
   "Serilog": {
     "Using":  [ "Serilog.Sinks.Console", "Serilog.Sinks.VictoriaLogs" ],
-    "MinimumLevel": "Information",
+    "MinimumLevel": "Error",
     "WriteTo": [
       { "Name": "Console" },
       { "Name": "VictoriaLogsHttp", "Args": { "victoriaLogsEndpoint": "http://localhost:9428/insert/jsonline"} }
@@ -50,7 +50,7 @@ builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration);
 });
 ```
-You are done, the application should now log everything to VictoriaLogs.
+You are done, the application should now log all errors to VictoriaLogs. If you want to log more, simply lower the minimum level to "Warning" or "Information" in `appsettings.json` under `Serilog:MinimumLevel`
 
 
 If you wish to enrich the logs with context-specific fields you can add any Serilog enrichers by referencing an appropriate enricher package such as `Serilog.Enrichers.Environment` or `Serilog.Enrichers.ClientInfo` and adding the enrichers in code or configuration. For example:
