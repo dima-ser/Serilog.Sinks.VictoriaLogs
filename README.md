@@ -21,16 +21,22 @@ In your `appsettings.json`, add the `Serilog` section (must be in the root):
 ```json
 {
   "Serilog": {
-    "Using":  [ "Serilog.Sinks.Console", "Serilog.Sinks.VictoriaLogs" ],
-    "MinimumLevel": "Error",
+    "Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.VictoriaLogs" ],
+    "MinimumLevel": "Information",
     "WriteTo": [
       { "Name": "Console" },
-      { "Name": "VictoriaLogsHttp", "Args": { "victoriaLogsEndpoint": "http://localhost:9428/insert/jsonline"} }
+      {
+        "Name": "VictoriaLogsHttp",
+        "Args": {
+          "victoriaLogsEndpoint": "http://localhost:9428/insert/jsonline",
+          "restrictedToMinimumLevel": "Error"
+        }
+      }
     ]
   }
 }
 ```
-Replace `victoriaLogsEndpoint` with your Victoria Logs JSON Stream API endpoint. You can also add additional settings as per [Serilog documentation](https://github.com/serilog/serilog-settings-configuration). Similarly, you can add or override arguments to `VictoriaLogsHttp:Args` as per [Serilog.Sinks.Http documenation](https://github.com/FantasticFiasco/serilog-sinks-http). Below is the description of arguments specific to `VictoriaLogsHttp` sink only. 
+Replace `victoriaLogsEndpoint` with your Victoria Logs JSON Stream API endpoint and `restrictedToMinimumLevel` with whatever log level you wish to be logged to VictoriaLogs. You can add additional parameters to `VictoriaLogsHttp:Args` as per [Serilog.Sinks.Http documenation](https://github.com/FantasticFiasco/serilog-sinks-http). Below is the description of parameters specific to `VictoriaLogsHttp` sink only. 
 
 | Parameter | Description |
 |----------|--------|
@@ -50,8 +56,7 @@ builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration);
 });
 ```
-You are done, the application should now log all errors to VictoriaLogs. If you want to log more, simply lower the minimum level to "Warning" or "Information" in `appsettings.json` under `Serilog:MinimumLevel`
-
+You are done, the application should now send all logs at or above your specified minimum level to VictoriaLogs. 
 
 If you wish to enrich the logs with context-specific fields you can add any Serilog enrichers by referencing an appropriate enricher package such as `Serilog.Enrichers.Environment` or `Serilog.Enrichers.ClientInfo` and adding the enrichers in code or configuration. For example:
 ```c#
